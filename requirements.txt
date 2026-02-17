@@ -1,0 +1,1 @@
+# Sin dependencias externas (solo librería estándar)
