@@ -1,1 +1,8 @@
-# Sin dependencias externas (solo librería estándar)
+# Dependencias opcionales recomendadas para desarrollo/ejecución
+# El core actual corre con librería estándar de Python 3.10+
+
+# Servidor ASGI opcional (si luego migras la API a FastAPI)
+uvicorn==0.30.6
+
+# Cliente HTTP opcional para scripts de prueba e integración entre nodos
+requests==2.32.3
