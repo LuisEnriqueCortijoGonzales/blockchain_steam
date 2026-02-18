@@ -65,6 +65,11 @@ Abrir: `http://localhost:8000`
 4. Probar ataque de transacción falsa y alteración de bloque.
 5. Ver indicador de integridad de cadena (`Válida ✅ / Manipulada ❌`).
 
+### Nota sobre la public key en pantalla
+
+Si la public key aparece con muchas barras invertidas (`\"`), eso indica que venía serializada como texto JSON dentro de otro JSON.
+En esta versión ya se muestra como objeto (`{"n": ..., "e": ...}`) + `public_key_preview` para lectura más clara.
+
 ---
 
 ## Red Raspberry Pi + PC (router local)

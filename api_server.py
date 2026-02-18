@@ -61,11 +61,13 @@ class APIServer(BaseHTTPRequestHandler):
             body = self._body_json()
             entropy = body.get("entropy") or secrets.token_hex(16)
             wallet = bc.wallet_from_entropy(entropy)
+            public_key_obj = json.loads(wallet.public_key_hex)
             self._json(
                 {
                     "entropy": entropy,
                     "private_key": entropy,
-                    "public_key": wallet.public_key_hex,
+                    "public_key": public_key_obj,
+                    "public_key_preview": f"n={str(public_key_obj['n'])[:24]}... , e={public_key_obj['e']}",
                     "address": wallet.address,
                     "warning": "Si compartes la private key/seed, otra persona controla la wallet.",
                 }

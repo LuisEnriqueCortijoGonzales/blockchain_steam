@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import argparse
+import json
 
 from mini_chain.blockchain import Blockchain
 from mini_chain.node import Node
@@ -48,10 +49,12 @@ def main() -> None:
             if cmd == "create-wallet" and len(parts) == 2:
                 entropy = parts[1]
                 w = bc.wallet_from_entropy(entropy)
+                pub = json.loads(w.public_key_hex)
                 print({
                     "entropy": entropy,
                     "private_key": entropy,
-                    "public_key": w.public_key_hex,
+                    "public_key": pub,
+                    "public_key_preview": f"n={str(pub['n'])[:24]}... , e={pub['e']}",
                     "address": w.address,
                     "warning": "No compartas private_key/seed: pierde control de la wallet.",
                 })

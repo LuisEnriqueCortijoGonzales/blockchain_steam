@@ -67,7 +67,22 @@ async function createWallet() {
   const entropy = document.getElementById('entropy').value;
   const r = await fetch('/api/wallet', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({entropy})});
   const data = await r.json();
-  document.getElementById('walletResult').textContent = JSON.stringify(data, null, 2);
+
+  let publicKey = data.public_key;
+  if (typeof publicKey === 'string') {
+    try { publicKey = JSON.parse(publicKey); } catch (_) {}
+  }
+
+  const pretty = {
+    entropy: data.entropy,
+    private_key: data.private_key,
+    public_key: publicKey,
+    public_key_preview: data.public_key_preview,
+    address: data.address,
+    warning: data.warning
+  };
+
+  document.getElementById('walletResult').textContent = JSON.stringify(pretty, null, 2);
 }
 
 async function createTx() {
