@@ -36,41 +36,91 @@ class APIServer(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(html)
             return
+
         if path == "/api/state":
             bc = self.blockchain
-            self._json({
-                "height": len(bc.chain) - 1,
-                "tip": bc.chain[-1].hash(),
-                "mempool": len(bc.mempool),
-                "chain": bc.chain_data(),
-                "wallets": [{"name": w.name, "address": w.address} for w in bc.wallets.values()],
-            })
+            self._json(
+                {
+                    "height": len(bc.chain) - 1,
+                    "tip": bc.chain[-1].hash(),
+                    "mempool": len(bc.mempool),
+                    "chain_valid": bc.validate_chain(),
+                    "chain": bc.chain_data(),
+                    "wallets": [{"name": w.name, "address": w.address} for w in bc.wallets.values()],
+                }
+            )
             return
+
         self._json({"error": "not found"}, 404)
 
     def do_POST(self) -> None:
         path = urlparse(self.path).path
         bc = self.blockchain
+
         if path == "/api/wallet":
             body = self._body_json()
-            name = body.get("name", "wallet")
-            seed = secrets.token_hex(16)
-            w = bc.register_wallet(name, seed)
-            self._json({"name": w.name, "seed": seed, "address": w.address})
+            entropy = body.get("entropy") or secrets.token_hex(16)
+            wallet = bc.wallet_from_entropy(entropy)
+            self._json(
+                {
+                    "entropy": entropy,
+                    "private_key": entropy,
+                    "public_key": wallet.public_key_hex,
+                    "address": wallet.address,
+                    "warning": "Si compartes la private key/seed, otra persona controla la wallet.",
+                }
+            )
             return
+
         if path == "/api/tx":
             try:
                 body = self._body_json()
-                tx = bc.create_transaction(body["wallet_name"], body["to_address"], float(body["amount"]))
+                tx = bc.create_transaction(
+                    from_address=body["from_address"],
+                    to_address=body["to_address"],
+                    amount=float(body["amount"]),
+                    private_material=body["private_key"],
+                )
                 ok = bc.add_transaction(tx)
                 self._json({"accepted": ok, "txid": tx.txid()})
             except Exception as exc:
                 self._json({"error": str(exc)}, 400)
             return
-        if path == "/api/mine":
-            b = bc.mine_block(bc.wallets["miner"].address)
-            self._json({"index": b.index, "hash": b.hash()})
+
+        if path == "/api/attack/fake-tx":
+            body = self._body_json()
+            tx = bc.build_fake_transaction(
+                from_address=body.get("from_address", ""),
+                to_address=body.get("to_address", "attacker-address"),
+                amount=float(body.get("amount", 9999)),
+            )
+            accepted = bc.add_transaction(tx)
+            self._json(
+                {
+                    "accepted": accepted,
+                    "message": "Transacción falsa rechazada: firma/UTXO inválidos" if not accepted else "Advertencia: aceptada",
+                }
+            )
             return
+
+        if path == "/api/attack/tamper":
+            body = self._body_json()
+            idx = int(body.get("index", 1))
+            tampered = bc.tamper_block(idx)
+            self._json(
+                {
+                    "tampered": tampered,
+                    "chain_valid_after_tamper": bc.validate_chain(),
+                    "message": "Al alterar un bloque, la cadena deja de ser válida" if tampered else "No se pudo alterar",
+                }
+            )
+            return
+
+        if path == "/api/mine":
+            block = bc.mine_block(bc.wallets["miner"].address)
+            self._json({"index": block.index, "hash": block.hash()})
+            return
+
         self._json({"error": "not found"}, 404)
 
 

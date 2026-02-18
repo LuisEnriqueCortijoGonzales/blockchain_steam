@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 import argparse
-import secrets
 
 from mini_chain.blockchain import Blockchain
 from mini_chain.node import Node
@@ -17,7 +16,10 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def print_help() -> None:
-    print("Comandos: create-wallet <nombre>, list-wallets, balance <address>, tx <wallet_name> <to_address> <amount>, mine-now, chain, mempool, peers, connect <host> <port>, help, exit")
+    print(
+        "Comandos: create-wallet <entropia>, balance <address>, tx <from_address> <to_address> <amount> <private_key/seed>, "
+        "attack-fake-tx <from_address> <to_address> <amount>, tamper <index>, mine-now, chain, mempool, peers, connect <host> <port>, help, exit"
+    )
 
 
 def main() -> None:
@@ -44,24 +46,31 @@ def main() -> None:
 
         try:
             if cmd == "create-wallet" and len(parts) == 2:
-                name = parts[1]
-                seed = secrets.token_hex(16)
-                w = bc.register_wallet(name, seed)
-                print({"name": w.name, "seed": seed, "address": w.address})
-            elif cmd == "list-wallets":
-                for w in bc.wallets.values():
-                    print({"name": w.name, "address": w.address})
+                entropy = parts[1]
+                w = bc.wallet_from_entropy(entropy)
+                print({
+                    "entropy": entropy,
+                    "private_key": entropy,
+                    "public_key": w.public_key_hex,
+                    "address": w.address,
+                    "warning": "No compartas private_key/seed: pierde control de la wallet.",
+                })
             elif cmd == "balance" and len(parts) == 2:
                 print(bc.balance_of(parts[1]))
-            elif cmd == "tx" and len(parts) == 4:
-                tx = bc.create_transaction(parts[1], parts[2], float(parts[3]))
+            elif cmd == "tx" and len(parts) == 5:
+                tx = bc.create_transaction(parts[1], parts[2], float(parts[3]), parts[4])
                 print("accepted" if bc.add_transaction(tx) else "rejected")
+            elif cmd == "attack-fake-tx" and len(parts) == 4:
+                tx = bc.build_fake_transaction(parts[1], parts[2], float(parts[3]))
+                print("accepted" if bc.add_transaction(tx) else "rejected (immutability/validation)")
+            elif cmd == "tamper" and len(parts) == 2:
+                tampered = bc.tamper_block(int(parts[1]))
+                print({"tampered": tampered, "chain_valid": bc.validate_chain()})
             elif cmd == "mine-now":
                 block = bc.mine_block(miner)
                 print({"index": block.index, "hash": block.hash()})
             elif cmd == "chain":
-                print(f"height={len(bc.chain)-1}")
-                print(f"tip={bc.chain[-1].hash()}")
+                print({"height": len(bc.chain) - 1, "tip": bc.chain[-1].hash(), "chain_valid": bc.validate_chain()})
             elif cmd == "mempool":
                 print(f"txs={len(bc.mempool)}")
             elif cmd == "connect" and len(parts) == 3:
