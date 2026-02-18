@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Mini Blockchain Dashboard</title>
+  <style>
+    :root { --bg:#0f172a; --panel:#1e293b; --panel2:#0b1220; --ok:#22c55e; --bad:#ef4444; --line:#334155; }
+    body { font-family: Inter, Arial, sans-serif; margin: 0; background: var(--bg); color: #e2e8f0; }
+    header { padding: 16px; background: #111827; display:grid; grid-template-columns: repeat(4,1fr); gap:12px; }
+    .badge { background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:10px; }
+    .k { opacity:.8; font-size:12px; text-transform: uppercase; letter-spacing:.6px; }
+    .v { font-size:16px; font-weight:700; }
+    main { display:grid; grid-template-columns: 1fr 1fr; gap:16px; padding:16px; }
+    .card { background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:14px; }
+    input, button { padding:10px; margin:6px 0; width:100%; border-radius:10px; border:1px solid var(--line); background:#0b1220; color:#e2e8f0; }
+    button { cursor:pointer; background:#1d4ed8; border:none; font-weight:600; }
+    button.secondary { background:#475569; }
+    button.danger { background:#b91c1c; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; word-break: break-all; }
+    pre { white-space:pre-wrap; }
+    .row { display:grid; grid-template-columns: 1fr 1fr; gap:8px; }
+    #chainCards { display:grid; gap:10px; max-height:460px; overflow:auto; }
+    .block { background:var(--panel2); border:1px solid var(--line); border-radius:12px; padding:12px; }
+    .tx { border-top:1px dashed var(--line); margin-top:8px; padding-top:8px; }
+  </style>
+</head>
+<body>
+<header>
+  <div class="badge"><div class="k">Altura</div><div class="v" id="height">0</div></div>
+  <div class="badge"><div class="k">Mempool</div><div class="v" id="mempool">0</div></div>
+  <div class="badge"><div class="k">Tip</div><div class="v mono" id="tip"></div></div>
+  <div class="badge"><div class="k">Integridad</div><div class="v" id="validity">-</div></div>
+</header>
+<main>
+  <section class="card">
+    <h3>Crear Wallet desde Entropía</h3>
+    <input id="entropy" placeholder="Ingresa entropía / seed (ej: luis-1234-seguro)" />
+    <button onclick="createWallet()">Generar Private/Public key + Address</button>
+    <pre id="walletResult" class="mono"></pre>
+  </section>
+
+  <section class="card">
+    <h3>Enviar BTC (estilo Bitcoin)</h3>
+    <input id="from" placeholder="from_address" />
+    <input id="privateKey" placeholder="private_key o seed del emisor" />
+    <input id="to" placeholder="to_address" />
+    <input id="amount" type="number" step="0.0001" placeholder="amount" />
+    <button onclick="createTx()">Firmar y enviar transacción</button>
+    <pre id="txResult" class="mono"></pre>
+    <div class="row">
+      <button class="secondary" onclick="mineNow()">Minar ahora</button>
+      <button class="danger" onclick="attackFakeTx()">Ataque: TX falsa</button>
+    </div>
+    <button class="danger" onclick="tamperChain()">Ataque: Alterar bloque #1</button>
+  </section>
+
+  <section class="card" style="grid-column:1/3">
+    <h3>Bloques empaquetados (tiempo real)</h3>
+    <div id="chainCards"></div>
+  </section>
+</main>
+<script>
+function short(v, n=18){ return !v ? '' : (v.length > n ? v.slice(0,n)+'…' : v); }
+
+async function createWallet() {
+  const entropy = document.getElementById('entropy').value;
+  const r = await fetch('/api/wallet', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({entropy})});
+  const data = await r.json();
+
+  let publicKey = data.public_key;
+  if (typeof publicKey === 'string') {
+    try { publicKey = JSON.parse(publicKey); } catch (_) {}
+  }
+
+  const pretty = {
+    entropy: data.entropy,
+    private_key: data.private_key,
+    public_key: publicKey,
+    public_key_preview: data.public_key_preview,
+    address: data.address,
+    warning: data.warning
+  };
+
+  document.getElementById('walletResult').textContent = JSON.stringify(pretty, null, 2);
+}
+
+async function createTx() {
+  const body = {
+    from_address: document.getElementById('from').value,
+    private_key: document.getElementById('privateKey').value,
+    to_address: document.getElementById('to').value,
+    amount: Number(document.getElementById('amount').value)
+  };
+  const r = await fetch('/api/tx', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
+  document.getElementById('txResult').textContent = JSON.stringify(await r.json(), null, 2);
+}
+
+async function mineNow() {
+  await fetch('/api/mine', {method:'POST'});
+}
+
+async function attackFakeTx() {
+  const body = {
+    from_address: document.getElementById('from').value,
+    to_address: document.getElementById('to').value || 'attacker-address',
+    amount: 9999
+  };
+  const r = await fetch('/api/attack/fake-tx', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
+  document.getElementById('txResult').textContent = JSON.stringify(await r.json(), null, 2);
+}
+
+async function tamperChain() {
+  const r = await fetch('/api/attack/tamper', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({index:1})});
+  document.getElementById('txResult').textContent = JSON.stringify(await r.json(), null, 2);
+}
+
+function renderBlocks(chain) {
+  const wrap = document.getElementById('chainCards');
+  const latest = chain.slice(-6).reverse();
+  wrap.innerHTML = latest.map(block => {
+    const txs = block.transactions.map((tx, idx) => {
+      const outs = tx.outputs.map(o => `<li>${o.amount} BTC → <span class='mono'>${short(o.address, 26)}</span></li>`).join('');
+      return `<div class='tx'>
+        <div><strong>Tx #${idx+1}</strong> ${tx.is_coinbase ? '(coinbase)' : ''}</div>
+        <ul>${outs}</ul>
+      </div>`;
+    }).join('');
+
+    return `<article class='block'>
+      <div><strong>Bloque #${block.index}</strong> | nonce=${block.nonce} | diff=${block.difficulty}</div>
+      <div class='mono'>hash: ${block.hash}</div>
+      <div class='mono'>prev: ${block.previous_hash}</div>
+      ${txs}
+    </article>`;
+  }).join('');
+}
+
+async function refreshState(){
+  const r = await fetch('/api/state');
+  const s = await r.json();
+  document.getElementById('height').textContent = s.height;
+  document.getElementById('mempool').textContent = s.mempool;
+  document.getElementById('tip').textContent = short(s.tip, 28);
+  const valid = document.getElementById('validity');
+  valid.textContent = s.chain_valid ? 'Válida ✅' : 'Manipulada ❌';
+  valid.style.color = s.chain_valid ? 'var(--ok)' : 'var(--bad)';
+  renderBlocks(s.chain);
+}
+
+setInterval(refreshState, 1000);
+refreshState();
+</script>
+</body>
+</html>
