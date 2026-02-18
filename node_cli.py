@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 import argparse
-import json
 
 from mini_chain.blockchain import Blockchain
 from mini_chain.node import Node
@@ -18,7 +17,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 def print_help() -> None:
     print(
-        "Comandos: create-wallet <entropia>, balance <address>, tx <from_address> <to_address> <amount> <private_key/seed>, "
+        "Comandos: create-wallet <entropia>, balance <address>, tx <from_address_btc> <to_address_btc> <amount> <private_key_wif|seed>, "
         "attack-fake-tx <from_address> <to_address> <amount>, tamper <index>, mine-now, chain, mempool, peers, connect <host> <port>, help, exit"
     )
 
@@ -48,15 +47,14 @@ def main() -> None:
         try:
             if cmd == "create-wallet" and len(parts) == 2:
                 entropy = parts[1]
-                w = bc.wallet_from_entropy(entropy)
-                pub = json.loads(w.public_key_hex)
+                w = bc.register_wallet(name=f"wallet-{len(bc.wallets)+1}", seed=entropy)
                 print({
                     "entropy": entropy,
-                    "private_key": entropy,
-                    "public_key": pub,
-                    "public_key_preview": f"n={str(pub['n'])[:24]}... , e={pub['e']}",
-                    "address": w.address,
-                    "warning": "No compartas private_key/seed: pierde control de la wallet.",
+                    "private_key_wif": w.private_key_wif,
+                    "public_key_compressed": w.btc_public_key_hex,
+                    "address": w.btc_address,
+                    "internal_signing_address": w.address,
+                    "warning": "No compartas private_key WIF/seed: pierdes control de la wallet.",
                 })
             elif cmd == "balance" and len(parts) == 2:
                 print(bc.balance_of(parts[1]))

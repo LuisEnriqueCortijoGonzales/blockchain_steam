@@ -9,35 +9,51 @@ class BlockchainTests(unittest.TestCase):
         w1 = bc.wallet_from_entropy("seed-demo")
         w2 = bc.wallet_from_entropy("seed-demo")
         self.assertEqual(w1.address, w2.address)
+        self.assertEqual(w1.private_key_wif, w2.private_key_wif)
+        self.assertEqual(w1.btc_address, w2.btc_address)
 
-    def test_transaction_signed_with_private_key_material(self):
+    def test_transaction_signed_with_seed(self):
         bc = Blockchain(difficulty=1, block_interval=999)
         miner_entropy = "miner-seed"
-        miner_wallet = bc.wallet_from_entropy(miner_entropy)
-        recv_wallet = bc.wallet_from_entropy("recv-seed")
+        miner_wallet = bc.register_wallet("miner", miner_entropy)
+        recv_wallet = bc.register_wallet("recv", "recv-seed")
 
         bc.mine_block(miner_wallet.address)
         tx = bc.create_transaction(
-            from_address=miner_wallet.address,
-            to_address=recv_wallet.address,
+            from_address=miner_wallet.btc_address,
+            to_address=recv_wallet.btc_address,
             amount=10,
             private_material=miner_entropy,
         )
         self.assertTrue(bc.add_transaction(tx))
         bc.mine_block(miner_wallet.address)
 
-        self.assertGreaterEqual(bc.balance_of(recv_wallet.address), 10)
+        self.assertGreaterEqual(bc.balance_of(recv_wallet.btc_address), 10)
+
+    def test_transaction_signed_with_wif(self):
+        bc = Blockchain(difficulty=1, block_interval=999)
+        sender = bc.register_wallet("sender", "owner-seed")
+        receiver = bc.register_wallet("receiver", "receiver-seed")
+        bc.mine_block(sender.address)
+
+        tx = bc.create_transaction(
+            from_address=sender.btc_address,
+            to_address=receiver.btc_address,
+            amount=1,
+            private_material=sender.private_key_wif,
+        )
+        self.assertTrue(bc.add_transaction(tx))
 
     def test_reject_when_private_key_not_matching_address(self):
         bc = Blockchain(difficulty=1, block_interval=999)
-        sender = bc.wallet_from_entropy("owner-seed")
-        receiver = bc.wallet_from_entropy("receiver-seed")
+        sender = bc.register_wallet("owner", "owner-seed")
+        receiver = bc.register_wallet("receiver", "receiver-seed")
         bc.mine_block(sender.address)
 
         with self.assertRaises(ValueError):
             bc.create_transaction(
-                from_address=sender.address,
-                to_address=receiver.address,
+                from_address=sender.btc_address,
+                to_address=receiver.btc_address,
                 amount=1,
                 private_material="wrong-seed",
             )

@@ -61,7 +61,8 @@ class Blockchain:
         return [u for u in unspent if (u.txid, u.vout) not in spent]
 
     def balance_of(self, address: str) -> float:
-        return round(sum(u.amount for u in self.utxos() if u.address == address), 8)
+        internal = self._resolve_internal_address(address)
+        return round(sum(u.amount for u in self.utxos() if u.address == internal), 8)
 
     def _find_spendable(self, address: str, amount: float) -> Tuple[List[UTXO], float]:
         total = 0.0
@@ -75,24 +76,45 @@ class Blockchain:
                 break
         return selected, total
 
+    def _resolve_internal_address(self, address: str) -> str:
+        for wallet in self.wallets.values():
+            if address in (wallet.address, wallet.btc_address):
+                return wallet.address
+        return address
+
+    def _wallet_for_signing(self, from_address: str, private_material: str) -> Wallet:
+        # 1) Intentar tratar el input como seed/entropía
+        normalized_from = self._resolve_internal_address(from_address)
+        from_seed_wallet = self.wallet_from_entropy(private_material)
+        if from_seed_wallet.address == normalized_from:
+            return from_seed_wallet
+
+        # 2) Intentar tratar el input como private key WIF de una wallet conocida
+        for wallet in self.wallets.values():
+            if wallet.address == normalized_from and wallet.private_key_wif == private_material:
+                return wallet
+
+        raise ValueError("Private key (seed/WIF) no corresponde al address emisor")
+
     def create_transaction(self, from_address: str, to_address: str, amount: float, private_material: str) -> Transaction:
         if amount <= 0:
             raise ValueError("El monto debe ser > 0")
 
-        signer_wallet = self.wallet_from_entropy(private_material)
-        if signer_wallet.address != from_address:
-            raise ValueError("Private key/seed no corresponde al address emisor")
+        signer_wallet = self._wallet_for_signing(from_address, private_material)
 
-        selected, total = self._find_spendable(from_address, amount)
+        internal_from = self._resolve_internal_address(from_address)
+        internal_to = self._resolve_internal_address(to_address)
+
+        selected, total = self._find_spendable(internal_from, amount)
         if total < amount:
             raise ValueError("Fondos insuficientes")
 
         inputs = [TxInput(txid=u.txid, vout=u.vout, signature="", public_key=signer_wallet.public_key_hex) for u in selected]
-        outputs = [TxOutput(amount=amount, address=to_address)]
+        outputs = [TxOutput(amount=amount, address=internal_to)]
 
         change = round(total - amount, 8)
         if change > 0:
-            outputs.append(TxOutput(amount=change, address=from_address))
+            outputs.append(TxOutput(amount=change, address=internal_from))
 
         tx = Transaction(inputs=inputs, outputs=outputs)
         msg = tx.signable_payload()

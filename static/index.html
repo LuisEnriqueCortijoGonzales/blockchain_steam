@@ -34,16 +34,16 @@
 </header>
 <main>
   <section class="card">
-    <h3>Crear Wallet desde Entropía</h3>
+    <h3>Crear Wallet (formato Bitcoin)</h3>
     <input id="entropy" placeholder="Ingresa entropía / seed (ej: luis-1234-seguro)" />
-    <button onclick="createWallet()">Generar Private/Public key + Address</button>
+    <button onclick="createWallet()">Generar WIF + Public Key + Address</button>
     <pre id="walletResult" class="mono"></pre>
   </section>
 
   <section class="card">
     <h3>Enviar BTC (estilo Bitcoin)</h3>
-    <input id="from" placeholder="from_address" />
-    <input id="privateKey" placeholder="private_key o seed del emisor" />
+    <input id="from" placeholder="from_address (bitcoin address)" />
+    <input id="privateKey" placeholder="private_key WIF o seed del emisor" />
     <input id="to" placeholder="to_address" />
     <input id="amount" type="number" step="0.0001" placeholder="amount" />
     <button onclick="createTx()">Firmar y enviar transacción</button>
@@ -75,10 +75,11 @@ async function createWallet() {
 
   const pretty = {
     entropy: data.entropy,
-    private_key: data.private_key,
-    public_key: publicKey,
-    public_key_preview: data.public_key_preview,
+    private_key_wif: data.private_key_wif,
+    public_key_compressed: publicKey,
+    public_key_format: data.public_key_format,
     address: data.address,
+    internal_signing_address: data.internal_signing_address,
     warning: data.warning
   };
 

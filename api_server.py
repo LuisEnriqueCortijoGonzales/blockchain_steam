@@ -46,7 +46,7 @@ class APIServer(BaseHTTPRequestHandler):
                     "mempool": len(bc.mempool),
                     "chain_valid": bc.validate_chain(),
                     "chain": bc.chain_data(),
-                    "wallets": [{"name": w.name, "address": w.address} for w in bc.wallets.values()],
+                    "wallets": [{"name": w.name, "address": w.btc_address, "internal_address": w.address} for w in bc.wallets.values()],
                 }
             )
             return
@@ -60,16 +60,16 @@ class APIServer(BaseHTTPRequestHandler):
         if path == "/api/wallet":
             body = self._body_json()
             entropy = body.get("entropy") or secrets.token_hex(16)
-            wallet = bc.wallet_from_entropy(entropy)
-            public_key_obj = json.loads(wallet.public_key_hex)
+            wallet = bc.register_wallet(name=f"wallet-{len(bc.wallets)+1}", seed=entropy)
             self._json(
                 {
                     "entropy": entropy,
-                    "private_key": entropy,
-                    "public_key": public_key_obj,
-                    "public_key_preview": f"n={str(public_key_obj['n'])[:24]}... , e={public_key_obj['e']}",
-                    "address": wallet.address,
-                    "warning": "Si compartes la private key/seed, otra persona controla la wallet.",
+                    "private_key_wif": wallet.private_key_wif,
+                    "public_key": wallet.btc_public_key_hex,
+                    "public_key_format": "compressed-hex (33 bytes)",
+                    "address": wallet.btc_address,
+                    "internal_signing_address": wallet.address,
+                    "warning": "Si compartes private key WIF o seed, otra persona controla la wallet.",
                 }
             )
             return

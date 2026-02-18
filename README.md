@@ -5,10 +5,10 @@ Proyecto de introducción a **criptografía + ciberseguridad**, con una mini-blo
 ## Enfoque didáctico que implementa
 
 - Wallets determinísticas desde **entropía/seed**.
-- Derivación: entropía → private key → public key → address.
+- Derivación: entropía → private key WIF (tipo Bitcoin) → public key comprimida → address Base58Check.
 - Modelo **UTXO**.
 - Envío de monedas por **address** (no por nombre de usuario).
-- Firma de transacciones con **private key/seed** del emisor.
+- Firma de transacciones con **private key WIF o seed** del emisor.
 - Prueba del riesgo de compartir private key (otro puede firmar por ti).
 - Intentos de ataque para mostrar **inmutabilidad**:
   - transacción falsa (UTXO/firma inválidos),
@@ -38,7 +38,7 @@ Comandos:
 
 - `create-wallet <entropia>`
 - `balance <address>`
-- `tx <from_address> <to_address> <amount> <private_key/seed>`
+- `tx <from_address_btc> <to_address_btc> <amount> <private_key_wif|seed>`
 - `attack-fake-tx <from_address> <to_address> <amount>`
 - `tamper <index>`
 - `mine-now`
@@ -61,14 +61,18 @@ Abrir: `http://localhost:8000`
 
 1. Crear wallet desde entropía.
 2. Guardar address + private key/seed.
-3. Enviar BTC usando **from_address + to_address + private_key**.
+3. Enviar BTC usando **from_address (Bitcoin) + to_address (Bitcoin) + private_key_wif/seed**.
 4. Probar ataque de transacción falsa y alteración de bloque.
 5. Ver indicador de integridad de cadena (`Válida ✅ / Manipulada ❌`).
 
-### Nota sobre la public key en pantalla
+### Formato de claves en pantalla
 
-Si la public key aparece con muchas barras invertidas (`\"`), eso indica que venía serializada como texto JSON dentro de otro JSON.
-En esta versión ya se muestra como objeto (`{"n": ..., "e": ...}`) + `public_key_preview` para lectura más clara.
+Ahora la wallet se muestra ordenada con formato Bitcoin-like:
+
+- `private_key_wif`: clave privada en formato WIF (Base58Check).
+- `public_key_compressed`: clave pública comprimida en hex (33 bytes).
+- `address`: dirección estilo Bitcoin (Base58Check).
+- `internal_signing_address`: address interno usado por el motor educativo para validación de firma/UTXO.
 
 ---
 

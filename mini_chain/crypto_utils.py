@@ -10,6 +10,12 @@ def sha256(data: bytes) -> bytes:
     return hashlib.sha256(data).digest()
 
 
+def ripemd160(data: bytes) -> bytes:
+    h = hashlib.new("ripemd160")
+    h.update(data)
+    return h.digest()
+
+
 def double_sha256(data: bytes) -> bytes:
     return sha256(sha256(data))
 
@@ -27,6 +33,35 @@ def b58encode(data: bytes) -> str:
         else:
             break
     return "1" * pad + (enc or "1")
+
+
+def b58check_encode(version: bytes, payload: bytes) -> str:
+    raw = version + payload
+    checksum = double_sha256(raw)[:4]
+    return b58encode(raw + checksum)
+
+
+def seed_to_private_bytes(seed: str) -> bytes:
+    return sha256(seed.encode("utf-8"))
+
+
+def wif_from_seed(seed: str, compressed: bool = True) -> str:
+    key32 = seed_to_private_bytes(seed)
+    suffix = b"\x01" if compressed else b""
+    return b58check_encode(b"\x80", key32 + suffix)
+
+
+def compressed_pubkey_from_seed(seed: str) -> str:
+    key32 = seed_to_private_bytes(seed)
+    x = sha256(b"pub-x" + key32)
+    prefix = b"\x02" if (x[-1] % 2 == 0) else b"\x03"
+    return (prefix + x).hex()
+
+
+def btc_address_from_pubkey_hex(pubkey_hex: str) -> str:
+    pub = bytes.fromhex(pubkey_hex)
+    h160 = ripemd160(sha256(pub))
+    return b58check_encode(b"\x00", h160)
 
 
 def modinv(a: int, m: int) -> int:
